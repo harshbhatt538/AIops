@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="data-container">
+        <h1>Service Data</h1>
+        <div id="data-display"></div>
+        <button onclick="goBack()">Go Back</button>
+    </div>
+    <script>
+        function goBack() {
+            window.history.back();
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const dataDisplay = document.getElementById('data-display');
+            const data = JSON.parse(sessionStorage.getItem('apiResponse'));
+
+            if (data && data.length > 0) {
+                data.forEach(item => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'data-item';
+                    itemElement.innerText = JSON.stringify(item, null, 2);  // Display item content in a readable format
+                    dataDisplay.appendChild(itemElement);
+                });
+            } else {
+                dataDisplay.innerText = 'No data available';
+            }
+        });
+    </script>
+</body>
+</html>

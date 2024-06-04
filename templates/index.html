@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <div class="side-panel left-panel">
+            <div class="panel-title">SLI / SLO</div>
+            <div class="sli-slo-item">Login (SLO Value)</div>
+            <div class="sli-slo-item">Recording (SLO Value)</div>
+            <div class="sli-slo-item">Notifications (SLO Value)</div>
+            <div class="sli-slo-item">Library (SLO Value)</div>
+            <div class="sli-slo-item">Streaming (SLO Value)</div>
+            <div class="sli-slo-item">Other... SLI / SLOs</div>
+        </div>
+        <div class="center-panel">
+            <div class="top-bar">
+                <button class="top-bar-btn">Alerts</button>
+                <button class="top-bar-btn">Analyzer</button>
+            </div>
+            <hr>
+            <div class="dashboard">
+                <div class="left-subpanel">
+                    <button class="subpanel-item">Web</button>
+                    <button class="subpanel-item">iOS</button>
+                    <button class="subpanel-item">Android</button>
+                    <button class="subpanel-item">Cameras</button>
+                </div>
+                <div class="center-dashboard">
+                    <button class="dashboard-item">OneCloud</button>
+                    <button class="dashboard-item">XCloud</button>
+                    <button class="dashboard-item">Backend</button>
+                    <button class="dashboard-item">HMSWeb</button>
+                    <button class="dashboard-item">Analytics</button>
+                    <button class="dashboard-item">Streaming</button>
+                    <button class="dashboard-item">API Gateway</button>
+                    <button class="dashboard-item">Partner</button>
+                </div>
+                <div class="right-subpanel">
+                    <button class="subpanel-item">Verisure</button>
+                    <button class="subpanel-item">Google</button>
+                    <button class="subpanel-item">Alexa</button>
+                    <button class="subpanel-item">IFTTT</button>
+                    <button class="subpanel-item">Salesforce</button>
+                    <button class="subpanel-item">ARIA</button>
+                    <button class="subpanel-item">Other Partners</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
