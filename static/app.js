@@ -27,4 +27,22 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     });
+
+    // Event listener for the "Alerts" button
+    const alertsButton = document.querySelector('.top-bar-btn:nth-of-type(1)'); // Adjust the selector as needed
+    if (alertsButton) {
+        alertsButton.addEventListener('click', () => {
+            window.location.href = '/alerts-page';
+        });
+    }
 });
+setInterval(function() {
+[] = {BACKEND,CLOUD}
+element = document.getElementsByClassName("dashboard-item")[0];
+createAlert(element);
+
+}, 10000);
+
+const createAlert = (element) =>{
+    element.style.background = 'red';
+}
