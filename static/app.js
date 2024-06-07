@@ -76,31 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Filter the events to include only those with type "incident" and state "open"
         const openIncidents = data.filter(event => event.type === 'incident' && event.state === 'open');
 
-        openIncidents.forEach(event => {
-            const row = document.createElement('tr');
 
-            const titleCell = document.createElement('td');
-            titleCell.textContent = event.problem || 'N/A';
-            row.appendChild(titleCell);
-
-            const onCell = document.createElement('td');
-            onCell.textContent = event.entityLabel || 'N/A';
-            row.appendChild(onCell);
-
-            const startedCell = document.createElement('td');
-            startedCell.textContent = event.start ? new Date(event.start).toLocaleString() : 'N/A';
-            row.appendChild(startedCell);
-
-            const endCell = document.createElement('td');
-            endCell.textContent = event.end ? new Date(event.end).toLocaleString() : 'N/A';
-            row.appendChild(endCell);
-
-            const timelineCell = document.createElement('td');
-            timelineCell.textContent = event.state || 'N/A';
-            row.appendChild(timelineCell);
-
-            tableBody.appendChild(row);
-        });
     };
 
     const updateServiceAlerts = (data) => {
@@ -128,7 +104,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
 
-        // Additional code to handle tab content display if necessary
+
     };
 
     fetchIncidentData();
