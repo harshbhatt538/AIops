@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Modify Services</title>
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .service-form {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .service-input {
+            width: 200px;
+            padding: 10px;
+            margin-right: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        .service-button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .service-button:hover {
+            background-color: #45a049;
+        }
+
+        .service-list {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .service-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .remove-button {
+            padding: 5px 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .remove-button:hover {
+            background-color: #e53935;
+        }
+
+        .back-button {
+            display: block;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #2196F3;
+            color: white;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+
+        .back-button:hover {
+            background-color: #1976D2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Modify Services</h1>
+        <form id="service-form" class="service-form">
+            <input type="text" id="service-name" name="service_name" placeholder="New Service Name" class="service-input">
+            <button type="submit" class="service-button">Add Service</button>
+        </form>
+        <ul id="service-list" class="service-list">
+            <!-- Services will be populated here -->
+        </ul>
+        <a href="/" class="back-button">Back to Dashboard</a>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async function() {
+            const serviceList = document.getElementById('service-list');
+
+            async function fetchServices() {
+                const response = await fetch('http://127.0.0.1:5000/services');
+                const data = await response.json();
+                return data.services;
+            }
+
+            function renderServices(services) {
+                serviceList.innerHTML = '';
+                services.forEach(service => {
+                    const serviceItem = document.createElement('li');
+                    serviceItem.className = 'service-item';
+                    serviceItem.dataset.id = service.id;
+                    serviceItem.innerHTML = `
+                        ${service.services}
+                        <button class="remove-button" onclick="deleteService(${service.id})">Remove</button>
+                    `;
+                    serviceList.appendChild(serviceItem);
+                });
+            }
+
+            async function deleteService(id) {
+                const response = await fetch(`/delete_service/${id}`, {
+                    method: 'DELETE',
+                });
+
+                if (response.ok) {
+                    const serviceItem = document.querySelector(`.service-item[data-id="${id}"]`);
+                    serviceItem.remove();
+                } else {
+                    const data = await response.json();
+                    alert(data.error);
+                }
+            }
+
+            document.getElementById('service-form').addEventListener('submit', async function(event) {
+                event.preventDefault();
+                const serviceName = document.getElementById('service-name').value;
+
+                const response = await fetch('/add_service', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ service_name: serviceName }),
+                });
+
+                const data = await response.json();
+                if (response.ok) {
+                    const serviceItem = document.createElement('li');
+                    serviceItem.className = 'service-item';
+                    serviceItem.dataset.id = data.service.id;
+                    serviceItem.innerHTML = `
+                        ${data.service.services}
+                        <button class="remove-button" onclick="deleteService(${data.service.id})">Remove</button>
+                    `;
+                    serviceList.appendChild(serviceItem);
+                    document.getElementById('service-name').value = '';
+                } else {
+                    alert(data.error);
+                }
+            });
+
+            const services = await fetchServices();
+            renderServices(services);
+        });
+    </script>
+</body>
+</html>

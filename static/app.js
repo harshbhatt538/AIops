@@ -1,4 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // Redirect to login if not authenticated
+    if (!sessionStorage.getItem('accessToken')) {
+        window.location.href = '/login';
+        return;
+    }
+
     const services = ["OneCloud", "XCloud", "Backend", "HMSWeb", "Analytics", "Streaming", "API Gateway", "Partner", "Messaging"];
     const centerDashboard = document.getElementById('center-dashboard');
 
@@ -12,12 +18,11 @@ document.addEventListener('DOMContentLoaded', () => {
         button.addEventListener('click', () => {
             const service = button.innerText;
 
-            fetch('/api/analyze', {
-                method: 'POST',
+            fetch('/api/events', {
+                method: 'GET',
                 headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ key: 'service', value: service })
+                    'Authorization': 'Bearer ' + sessionStorage.getItem('accessToken')
+                }
             })
             .then(response => response.json())
             .then(data => {
@@ -25,8 +30,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.error('Error:', data.errors);
                 } else {
                     console.log(data);
-                    sessionStorage.setItem('apiResponse', JSON.stringify(data.items));
-                    window.location.href = '/data-page';
+                    const serviceData = data.filter(event => event.entityLabel === service);
+                    sessionStorage.setItem('apiResponse', JSON.stringify(serviceData));
+                    window.location.href = '/chart-page';
                 }
             })
             .catch(error => {
@@ -43,11 +49,54 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const modifyServiceButton = document.getElementById('modifyService-button');
+    if (modifyServiceButton) {
+        modifyServiceButton.addEventListener('click', () => {
+            window.location.href = 'http://127.0.0.1:5000/modify-service';
+        });
+    }
+
+    $(document).ready(function() {
+        // Setup for adding JWT token to all AJAX requests
+        $.ajaxSetup({
+            beforeSend: function(xhr) {
+                var token = sessionStorage.getItem('accessToken');
+                if (token) {
+                    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+                }
+            }
+        });
+
+        // Login form submission
+        $('#login-form').on('submit', function(e) {
+            e.preventDefault();
+            var formData = {
+                'username': $('#username').val(),
+                'password': $('#password').val()
+            };
+
+            $.ajax({
+                type: 'POST',
+                url: '/login',
+                contentType: 'application/json',
+                data: JSON.stringify(formData),
+                success: function(response) {
+                    // Store the JWT token in sessionStorage
+                    sessionStorage.setItem('accessToken', response.access_token);
+                    window.location.href = '/';
+                },
+                error: function(response) {
+                    alert(response.responseJSON.error);
+                }
+            });
+        });
+    });
+
     const fetchIncidentData = async () => {
         try {
             const response = await fetch('/api/events', {
                 headers: {
-                    'Authorization': 'apitoken pncHtgATRjep2fo0poggJQ'
+                    'Authorization': 'Bearer ' + sessionStorage.getItem('accessToken')
                 }
             });
 
@@ -76,7 +125,18 @@ document.addEventListener('DOMContentLoaded', () => {
         // Filter the events to include only those with type "incident" and state "open"
         const openIncidents = data.filter(event => event.type === 'incident' && event.state === 'open');
 
-
+        openIncidents.forEach(incident => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${incident.id}</td>
+                <td>${incident.entityLabel}</td>
+                <td>${incident.type}</td>
+                <td>${incident.state}</td>
+                <td>${incident.start}</td>
+                <td>${incident.end}</td>
+            `;
+            tableBody.appendChild(row);
+        });
     };
 
     const updateServiceAlerts = (data) => {
@@ -103,8 +163,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 tab.classList.add('active');
             }
         });
-
-
     };
 
     fetchIncidentData();

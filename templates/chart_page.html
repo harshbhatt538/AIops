@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Monitoring Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f4f4;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: #34495e;
+            color: #fff;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .logo {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        nav a {
+            color: #fff;
+            margin: 0 15px;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        nav a:hover {
+            text-decoration: underline;
+        }
+
+        .search-bar input {
+            padding: 7px 10px;
+            border: none;
+            border-radius: 4px;
+            width: 200px;
+        }
+
+        main {
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .summary, .top-services, .service-diagram, .applications {
+            margin-bottom: 20px;
+        }
+
+        .summary {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .error-summary, .applications-dashboard {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 48%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .error-summary h2, .applications-dashboard h3 {
+            margin-top: 0;
+        }
+
+        .chart-container {
+            margin-top: 20px;
+            height: 200px;
+        }
+
+        .top-services {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .upstream, .downstream {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 48%;
+        }
+
+        .upstream h3, .downstream h3 {
+            margin-top: 0;
+            font-size: 18px;
+            color: #34495e;
+        }
+
+        .upstream ul, .downstream ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .upstream ul li, .downstream ul li {
+            background: #ecf0f1;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .service-diagram {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        footer {
+            background: #34495e;
+            color: #fff;
+            text-align: center;
+            padding: 15px 0;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 200px !important;
+        }
+
+        #cy {
+            width: 100%;
+            height: 400px;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
+</head>
+<body>
+    <header>
+        <div class="logo">Service Monitor</div>
+        <nav>
+            <a href="#">Home</a>
+            <a href="#">Error Logs</a>
+            <a href="#">Service Status</a>
+            <a href="#">Settings</a>
+        </nav>
+        <div class="search-bar">
+            <input type="text" placeholder="Search...">
+        </div>
+    </header>
+    <main>
+        <section class="summary">
+            <div class="error-summary">
+                <h2>5xx Errors</h2>
+                <p>Total Errors: 0.X5</p>
+                <p>Last Error Time: 12:35</p>
+                <div class="chart-container">
+                    <canvas id="trendChart"></canvas>
+                </div>
+            </div>
+            <div class="applications-dashboard">
+                <h3>Applications Dashboard</h3>
+                <div class="chart-container">
+                    <canvas id="applicationsChart"></canvas>
+                </div>
+            </div>
+        </section>
+        <section class="top-services">
+            <div class="upstream">
+                <h3>Top 3 Upstream Services</h3>
+                <ul>
+                    <li>Service 1</li>
+                    <li>Service 2</li>
+                    <li>Service 3</li>
+                </ul>
+            </div>
+            <div class="downstream">
+                <h3>Top 3 Downstream Services</h3>
+                <ul>
+                    <li>Service 4</li>
+                    <li>Service 5</li>
+                    <li>Service 6</li>
+                </ul>
+            </div>
+        </section>
+        <section class="service-diagram">
+            <h3>Service Interaction Diagram</h3>
+            <div id="cy"></div>
+        </section>
+    </main>
+    <footer>
+        <p>Contact Information</p>
+        <p>Documentation and Support Links</p>
+    </footer>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const ctxTrend = document.getElementById('trendChart').getContext('2d');
+
+            async function getChartData() {
+                const currentDate = new Date();
+                const labels = [];
+                const errorCounts = [];
+
+                for (let i = 5; i >= 0; i--) {
+                    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
+                    const label = targetDate.toLocaleString('default', { month: 'short' });
+                    labels.push(label);
+
+                    const fromTime = targetDate.getTime();
+                    const toTime = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1).getTime();
+
+                    const dataForMonth = await fetchDataForMonth(toTime, fromTime);
+                    errorCounts.push(dataForMonth.length); // Adjust based on actual data structure
+
+                }
+
+                updateChart(labels, errorCounts);
+            }
+
+            async function fetchDataForMonth(toTime, fromTime) {
+                const requestBody = {
+                    "tagFilterExpression": {
+                        "type": "TAG_FILTER",
+                        "name": "call.http.statusClass",
+                        "operator": "EQUALS",
+                        "entity": "NOT_APPLICABLE",
+                        "value": "5xx"
+                    },
+                    "timeFrame": {
+                        "to": toTime,
+                        "windowSize": toTime - fromTime // Fixed the windowSize calculation
+
+                    }
+                };
+
+                try {
+                    const response = await fetch('/api/proxy', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!response.ok) {
+                        console.error("Failed to fetch data:", response.statusText);
+                        return [];
+                    }
+
+                    return await response.json();
+                } catch (error) {
+                    console.error("Error fetching data:", error);
+                    return [];
+                }
+            }
+
+            function updateChart(labels, errorCounts) {
+                trendChart.data.labels = labels;
+                trendChart.data.datasets[0].data = errorCounts;
+                trendChart.update();
+            }
+
+            const trendChart = new Chart(ctxTrend, {
+                type: 'bar',
+                data: {
+                    labels: [], // Initially empty labels
+
+                    datasets: [{
+                        label: '5xx Errors',
+                        data: [], // Initially empty data
+
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 1
+
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true
+
+                        }
+                    }
+                }
+            });
+
+            getChartData();
+        });
+
+
+
+            // Applications Dashboard Chart
+            const ctxApps = document.getElementById('applicationsChart').getContext('2d');
+            const applicationsChart = new Chart(ctxApps, {
+                type: 'bar',
+                data: {
+                    labels: ['Service 1', 'Service 2', 'Service 3', 'Service 4', 'Service 5'],
+                    datasets: [{
+                        label: 'Number of Errors',
+                        data: [100, 200, 150, 300, 250],
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }, {
+                        label: 'Error Rate (%)',
+                        data: [2, 3, 1, 4, 2],
+                        backgroundColor: 'rgba(255, 159, 64, 0.2)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        borderWidth: 1,
+                        yAxisID: 'y2'
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            position: 'left',
+                            ticks: {
+                                callback: function(value) {
+                                    return value + ' errors';
+                                }
+                            }
+                        },
+                        y2: {
+                            beginAtZero: true,
+                            position: 'right',
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Service Interaction Diagram
+            const cy = cytoscape({
+                container: document.getElementById('cy'),
+
+                elements: [ // list of graph elements to start with
+                    { data: { id: 'a' } },
+                    { data: { id: 'b' } },
+                    { data: { id: 'c' } },
+                    { data: { id: 'd' } },
+                    { data: { id: 'e' } },
+                    { data: { id: 'f' } },
+                    { data: { id: 'g' } },
+                    { data: { id: 'h' } },
+                    { data: { id: 'i' } },
+                    { data: { id: 'j' } },
+                    { data: { id: 'k' } },
+                    { data: { id: 'l' } },
+
+                    { data: { id: 'ab', source: 'a', target: 'b' } },
+                    { data: { id: 'ac', source: 'a', target: 'c' } },
+                    { data: { id: 'ad', source: 'a', target: 'd' } },
+                    { data: { id: 'be', source: 'b', target: 'e' } },
+                    { data: { id: 'cf', source: 'c', target: 'f' } },
+                    { data: { id: 'dg', source: 'd', target: 'g' } },
+                    { data: { id: 'eh', source: 'e', target: 'h' } },
+                    { data: { id: 'fi', source: 'f', target: 'i' } },
+                    { data: { id: 'gj', source: 'g', target: 'j' } },
+                    { data: { id: 'hk', source: 'h', target: 'k' } },
+                    { data: { id: 'il', source: 'i', target: 'l' } }
+                ],
+
+                style: [ // the stylesheet for the graph
+                    {
+                        selector: 'node',
+                        style: {
+                            'background-color': '#3498db',
+                            'label': 'data(id)',
+                            'color': '#fff',
+                            'text-valign': 'center',
+                            'text-halign': 'center'
+                        }
+                    },
+
+                    {
+                        selector: 'edge',
+                        style: {
+                            'width': 3,
+                            'line-color': '#2ecc71',
+                            'target-arrow-color': '#2ecc71',
+                            'target-arrow-shape': 'triangle'
+                        }
+                    }
+                ],
+
+                layout: {
+                    name: 'grid',
+                    rows: 3
+                }
+            });
+
+    </script>
+</body>
+</html>
