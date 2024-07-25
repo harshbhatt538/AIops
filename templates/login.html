@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -44,7 +45,10 @@
             .then(data => {
                 if (data.access_token) {
                     sessionStorage.setItem('accessToken', data.access_token);
-                    window.location.href = '/';  // Redirect to the dashboard
+                    console.log("Access Token:", data.access_token); // Debug statement
+
+                    window.location.href = 'http://127.0.0.1:5000/';  // Redirect to the dashboard
+
                 } else {
                     document.getElementById('error-message').innerText = data.error || 'Invalid credentials. Please try again.';
                 }
@@ -55,17 +59,48 @@
             });
         });
 
-        // Include the JWT token in all AJAX requests
-        $.ajaxSetup({
-            beforeSend: function(xhr) {
-                var token = sessionStorage.getItem('accessToken');
+        // Include the JWT token in all fetch requests
+
+
+        // Override the global fetch function
+
+        window.fetch = (originalFetch => {
+            return (...args) => {
+                const token = sessionStorage.getItem('accessToken');
+
+                // Log to verify the token
+                console.log('Token Retrieved:', token);
+
                 if (token) {
-                    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+                    if (!args[1]) {
+                        args[1] = {};
+                    }
+                    if (!args[1].headers) {
+                        args[1].headers = {};
+                    }
+                    args[1].headers['Authorization'] = `Bearer ${token}`;
+
+                    // Log the headers to verify the Authorization header
+                    console.log('Request Headers Before Fetch:', args[1].headers);
                 }
-            }
-        });
+
+                return originalFetch(...args)
+                    .then(response => {
+                        // Log the request and response to debug
+                        console.log('Request URL:', args[0]);
+                        console.log('Request Headers Sent:', args[1]?.headers);
+                        console.log('Response Status:', response.status);
+                        return response;
+                    })
+                    .catch(error => {
+                        console.error('Fetch error:', error);
+                        throw error;
+                    });
+            };
+        })(window.fetch);
+
+
+
     </script>
-
-
 </body>
 </html>

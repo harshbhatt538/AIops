@@ -44,7 +44,8 @@ with app.app_context():
 
 @app.route('/')
 @jwt_required()
-def home():
+def index():
+    current_user = get_jwt_identity()
     return render_template('index.html')
 
 
@@ -72,7 +73,6 @@ def register():
 
 
 @app.route('/login', methods=['POST'])
-@app.route('/login', methods=['POST'])
 def login():
     try:
         data = request.get_json()
@@ -85,13 +85,13 @@ def login():
             access_token = create_access_token(identity={'username': user.username, 'email': user.email})
             response = jsonify(access_token=access_token)
             set_access_cookies(response, access_token)
+            print("Access Token Generated:", access_token)  # Debug statement
             return response
         else:
             return jsonify({'error': 'Invalid credentials'}), 401
     except Exception as e:
         logging.error('Error during login: %s', e)
         return jsonify({'error': 'An error occurred during login'}), 500
-
 
 
 @app.route('/login', methods=['GET'])
