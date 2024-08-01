@@ -1,14 +1,14 @@
 import os
 import requests
-from flask import Flask, jsonify, request, render_template, redirect, url_for, flash
+from flask import Flask, jsonify, request, make_response, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, set_access_cookies
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 from datetime import timedelta
 import logging
 
-# Load environment variables from a .env file or set them in the environment
+# Load environment variables
 SECRET_KEY = os.getenv('SECRET_KEY', 'SUPER-SECRET-KEY')
 DATABASE_URI = os.getenv('SQLALCHEMY_DATABASE_URI', 'mysql+pymysql://newuser:Hyb215215@localhost:3306/usresdb')
 JWT_SECRET = os.getenv('JWT_SECRET_KEY', 'SUPER-SECRET-KEY')
@@ -21,6 +21,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URI
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['JWT_SECRET_KEY'] = JWT_SECRET
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
+app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # Use cookies for storing JWT
+app.config['JWT_ACCESS_COOKIE_PATH'] = '/'  # Path for the access cookie
+app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Disable CSRF protection for simplicity (not recommended for production)
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -59,7 +62,7 @@ def register():
             return redirect(url_for('register'))
 
         hashed_password = generate_password_hash(data['password'], method='pbkdf2:sha256')
-        new_user = User(username=data['username'], email=data['email'], password=hashed_password)
+        new_user = User(username=data['username'], email=data['email'], password=hashed_password),
 
         try:
             db.session.add(new_user)
@@ -74,24 +77,19 @@ def register():
 
 @app.route('/login', methods=['POST'])
 def login():
-    try:
-        data = request.get_json()
-        if not data or 'username' not in data or 'password' not in data:
-            return jsonify({'error': 'Username and password are required'}), 400
+    data = request.get_json()
+    if not data or 'username' not in data or 'password' not in data:
+        return jsonify({'error': 'Username and password are required'}), 400
 
-        user = User.query.filter_by(username=data['username']).first()
+    user = User.query.filter_by(username=data['username']).first()
 
-        if user and check_password_hash(user.password, data['password']):
-            access_token = create_access_token(identity={'username': user.username, 'email': user.email})
-            response = jsonify(access_token=access_token)
-            set_access_cookies(response, access_token)
-            print("Access Token Generated:", access_token)  # Debug statement
-            return response
-        else:
-            return jsonify({'error': 'Invalid credentials'}), 401
-    except Exception as e:
-        logging.error('Error during login: %s', e)
-        return jsonify({'error': 'An error occurred during login'}), 500
+    if user and check_password_hash(user.password, data['password']):
+        access_token = create_access_token(identity={'username': user.username, 'email': user.email})
+        response = jsonify(access_token=access_token)
+        response.set_cookie('access_token_cookie', access_token, httponly=True, secure=True)
+        return response
+    else:
+        return jsonify({'error': 'Invalid credentials'}), 401
 
 
 @app.route('/login', methods=['GET'])

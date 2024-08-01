@@ -1,9 +1,13 @@
 document.addEventListener('DOMContentLoaded', () => {
     // Redirect to login if not authenticated
-    if (!sessionStorage.getItem('accessToken')) {
-        window.location.href = '/login';
-        return;
-    }
+    fetch('/protected', {
+        method: 'GET',
+        credentials: 'include'  // Include cookies with the request
+    }).then(response => {
+        if (!response.ok) {
+            window.location.href = '/login';
+        }
+    });
 
     const services = ["OneCloud", "XCloud", "Backend", "HMSWeb", "Analytics", "Streaming", "API Gateway", "Partner", "Messaging"];
     const centerDashboard = document.getElementById('center-dashboard');
@@ -20,9 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             fetch('/api/events', {
                 method: 'GET',
-                headers: {
-                    'Authorization': 'Bearer ' + sessionStorage.getItem('accessToken')
-                }
+                credentials: 'include'  // Include cookies with the request
             })
             .then(response => response.json())
             .then(data => {
@@ -57,16 +59,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     $(document).ready(function() {
-        // Setup for adding JWT token to all AJAX requests
-        $.ajaxSetup({
-            beforeSend: function(xhr) {
-                var token = sessionStorage.getItem('accessToken');
-                if (token) {
-                    xhr.setRequestHeader('Authorization', 'Bearer ' + token);
-                }
-            }
-        });
-
         // Login form submission
         $('#login-form').on('submit', function(e) {
             e.preventDefault();
@@ -81,8 +73,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 contentType: 'application/json',
                 data: JSON.stringify(formData),
                 success: function(response) {
-                    // Store the JWT token in sessionStorage
-                    sessionStorage.setItem('accessToken', response.access_token);
                     window.location.href = '/';
                 },
                 error: function(response) {
@@ -95,12 +85,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const fetchIncidentData = async () => {
         try {
             const response = await fetch('/api/events', {
-                headers: {
-                    'Authorization': 'Bearer ' + sessionStorage.getItem('accessToken')
-                }
+                credentials: 'include'  // Include cookies with the request
             });
 
             if (!response.ok) {
+                if (response.status === 401) {
+                    console.error('Unauthorized access, redirecting to login.');
+                    window.location.href = '/login';
+                }
                 throw new Error(`HTTP error! Status: ${response.status}`);
             }
 
