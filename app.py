@@ -1,12 +1,18 @@
 import os
 import requests
-from flask import Flask, jsonify, request, make_response, render_template, redirect, url_for, flash
+from flask import Flask, jsonify, request, render_template, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 from datetime import timedelta
 import logging
+from collections import defaultdict
+import time
+
+logging.basicConfig(level=logging.INFO)
+
+global_service_name = None
 
 # Load environment variables
 SECRET_KEY = os.getenv('SECRET_KEY', 'SUPER-SECRET-KEY')
@@ -24,6 +30,25 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(minutes=60)
 app.config['JWT_TOKEN_LOCATION'] = ['cookies']  # Use cookies for storing JWT
 app.config['JWT_ACCESS_COOKIE_PATH'] = '/'  # Path for the access cookie
 app.config['JWT_COOKIE_CSRF_PROTECT'] = False  # Disable CSRF protection for simplicity (not recommended for production)
+
+wsOneday = 86400000
+
+
+class EpochTimeManager:
+    def __init__(self):
+        self.epoch_time_ms = None
+
+    def update_time(self):
+        self.epoch_time_ms = int(time.time() * 1000)
+
+    def get_time(self):
+        if self.epoch_time_ms is None:
+            raise ValueError("Epoch time has not been set")
+        return self.epoch_time_ms
+
+
+time_manager = EpochTimeManager()
+time_manager.update_time()  # Update the epoch time initially
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -159,10 +184,23 @@ def alerts_page():
     return render_template('alerts_page.html')
 
 
-@app.route('/chart-page')
+@app.route('/chart-page', methods=['POST'])
 @jwt_required()
 def chart_page():
-    return render_template('chart_page.html')
+    data = request.get_json()
+    service_name = data.get('service_name')
+
+    if not service_name:
+        return jsonify({'message': 'Service name is required'}), 400
+
+    # Logic for handling the service name and generating the chart can go here
+
+    global global_service_name
+    global_service_name = service_name
+
+    app.logger.info(f"Service Name: {global_service_name}")
+
+    return render_template('chart_page.html', service_name=service_name)
 
 
 @app.route('/modify-service')
@@ -197,6 +235,110 @@ def proxy():
         return jsonify({'error': 'Failed to fetch data'}), response.status_code
 
     return jsonify(response.json())
+
+
+@app.route('/api/5xx_errors', methods=['GET'])
+def get_5xx_errors():
+    logging.info("5xx errors endpoint hit")
+
+    # Get the current epoch time
+    current_epoch_time = time_manager.get_time()
+    logging.info(f'Current epoch time: {current_epoch_time}')
+
+    # Replace with your actual API request
+    api_url = "https://nonprd-arlo.instana.io/api/application-monitoring/analyze/traces"
+    headers = {
+        "Authorization": "apitoken pncHtgATRjep2fo0poggJQ"
+    }
+    body = {
+        "timeFrame": {
+            "to": current_epoch_time,
+            "focusedMoment": current_epoch_time,
+            "autoRefresh": False,
+            "windowSize": wsOneday
+        },
+        "tagFilterExpression": {
+            "type": "EXPRESSION",
+            "logicalOperator": "AND",
+            "elements": [
+                {
+                    "type": "TAG_FILTER",
+                    "name": "call.http.statusClass",
+                    "operator": "EQUALS",
+                    "entity": "NOT_APPLICABLE",
+                    "value": "5xx"
+                },
+                {
+                    "type": "TAG_FILTER",
+                    "name": "application.name",
+                    "operator": "EQUALS",
+                    "entity": "DESTINATION",
+                    "value": "GoldenDev Hmsdeviceevents"
+                }
+            ]
+        },
+        "metrics": [
+            {
+                "metric": "calls",
+                "aggregation": "SUM"
+            },
+            {
+                "metric": "errors",
+                "aggregation": "MEAN"
+            },
+            {
+                "metric": "latency",
+                "aggregation": "MEAN"
+            }
+        ],
+        "order": {
+            "by": "timestamp",
+            "direction": "ASC"
+        },
+        "group": {
+            "groupbyTag": "endpoint.name",
+            "groupbyTagEntity": "DESTINATION"
+        },
+        "includeInternal": False,
+        "includeSynthetic": False
+    }
+
+    logging.info(f'Sending request to API: {api_url} with body: {body}')
+    response = requests.post(api_url, headers=headers, json=body)
+    data = response.json()
+
+    logging.info(f'Raw API Data: {data}')
+
+    # Initialize a dictionary to store hourly data counts
+    hourly_data = defaultdict(int)
+
+    # Time frame start (24 hours ago)
+    time_frame_start = current_epoch_time - wsOneday
+
+    logging.info(f'Time frame start: {time_frame_start}')
+
+    # Iterate through the items and group them by hour within the last 24 hours
+    for item in data.get("items", []):
+        timestamp = item["trace"]["startTime"]
+
+        # Check if the trace is within the last 24 hours
+        if time_frame_start <= timestamp <= current_epoch_time:
+            # Convert the timestamp to hour (considering IST timezone offset +05:30)
+            hour = time.strftime('%H', time.gmtime((timestamp + 19800000) / 1000))
+            hourly_data[hour] += 1  # Increment count for that hour
+
+    # Generate a complete list of hours from the start to current time
+    time_labels = []
+    for i in range(24):
+        label_hour = (time_frame_start + (i * 3600000)) // 1000
+        time_labels.append(time.strftime('%H:00', time.gmtime((label_hour + 19800000))))
+
+    # Convert to a list of dictionaries
+    items = [{"hour": hour, "count": hourly_data.get(hour.split(':')[0], 0)} for hour in time_labels]
+
+    logging.info(f'Processed Hourly Data: {items}')
+
+    return jsonify(items)
 
 
 if __name__ == '__main__':

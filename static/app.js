@@ -20,22 +20,27 @@ document.addEventListener('DOMContentLoaded', () => {
         centerDashboard.appendChild(button);
 
         button.addEventListener('click', () => {
-            const service = button.innerText;
+            const serviceName = button.innerText;
 
-            fetch('/api/events', {
-                method: 'GET',
-                credentials: 'include'  // Include cookies with the request
+            fetch('/chart-page', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',  // Include cookies with the request
+
+                body: JSON.stringify({ service_name: serviceName })
             })
-            .then(response => response.json())
-            .then(data => {
-                if (data.errors) {
-                    console.error('Error:', data.errors);
-                } else {
-                    console.log(data);
-                    const serviceData = data.filter(event => event.entityLabel === service);
-                    sessionStorage.setItem('apiResponse', JSON.stringify(serviceData));
-                    window.location.href = '/chart-page';
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(data => { throw new Error(data.message) });
                 }
+                return response.text();
+            })
+            .then(html => {
+                document.open();
+                document.write(html);
+                document.close();
             })
             .catch(error => {
                 console.error('Error:', error);
@@ -131,13 +136,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+
     const updateServiceAlerts = (data) => {
         const openIncidents = data.filter(event => event.type === 'incident' && event.state === 'open');
         const serviceButtons = document.querySelectorAll('.dashboard-item');
 
         serviceButtons.forEach(button => {
             const serviceName = button.innerText.toLowerCase();
-            const hasAlert = openIncidents.some(incident => incident.entityLabel.toLowerCase().includes(serviceName));
+            const hasAlert = openIncidents.some(incident => incident.problem.toLowerCase().includes(serviceName));
 
             if (hasAlert) {
                 button.style.backgroundColor = 'red';
@@ -146,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     };
+
 
     const showTab = (tabName) => {
         const tabs = document.querySelectorAll('.tab-button');

@@ -204,60 +204,27 @@
             const ctxTrend = document.getElementById('trendChart').getContext('2d');
 
             async function getChartData() {
-                const currentDate = new Date();
-                const labels = [];
-                const errorCounts = [];
-
-                for (let i = 5; i >= 0; i--) {
-                    const targetDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - i, 1);
-                    const label = targetDate.toLocaleString('default', { month: 'short' });
-                    labels.push(label);
-
-                    const fromTime = targetDate.getTime();
-                    const toTime = new Date(targetDate.getFullYear(), targetDate.getMonth() + 1, 1).getTime();
-
-                    const dataForMonth = await fetchDataForMonth(toTime, fromTime);
-                    errorCounts.push(dataForMonth.length); // Adjust based on actual data structure
-
-                }
-
-                updateChart(labels, errorCounts);
-            }
-
-            async function fetchDataForMonth(toTime, fromTime) {
-                const requestBody = {
-                    "tagFilterExpression": {
-                        "type": "TAG_FILTER",
-                        "name": "call.http.statusClass",
-                        "operator": "EQUALS",
-                        "entity": "NOT_APPLICABLE",
-                        "value": "5xx"
-                    },
-                    "timeFrame": {
-                        "to": toTime,
-                        "windowSize": toTime - fromTime // Fixed the windowSize calculation
-
-                    }
-                };
-
                 try {
-                    const response = await fetch('/api/proxy', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(requestBody)
-                    });
+                    // Fetch data from the API
+                    const response = await fetch('/api/5xx_errors');
 
+                    // Check if the response status is not OK
                     if (!response.ok) {
-                        console.error("Failed to fetch data:", response.statusText);
-                        return [];
+                        throw new Error('Failed to fetch data: ' + response.statusText);
                     }
 
-                    return await response.json();
+                    // Parse the JSON data
+                    const data = await response.json();
+
+                    // Extract labels (hours) and data (error counts)
+                    const labels = data.map(entry => entry.hour);
+                    const errorCounts = data.map(entry => entry.count);
+
+                    // Update the chart with the new data
+                    updateChart(labels, errorCounts);
                 } catch (error) {
-                    console.error("Error fetching data:", error);
-                    return [];
+                    // Log any errors to the console
+                    console.error('Error in getChartData:', error);
                 }
             }
 
@@ -268,32 +235,38 @@
             }
 
             const trendChart = new Chart(ctxTrend, {
-                type: 'bar',
+                type: 'line',
                 data: {
-                    labels: [], // Initially empty labels
-
+                    labels: [],  // Initially empty labels
                     datasets: [{
                         label: '5xx Errors',
-                        data: [], // Initially empty data
-
+                        data: [],  // Initially empty data
                         borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: true,
+                        tension: 0.4
                     }]
                 },
                 options: {
                     scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Time'
+                            }
+                        },
                         y: {
+                            title: {
+                                display: true,
+                                text: 'Number of Errors'
+                            },
                             beginAtZero: true
-
                         }
                     }
                 }
             });
 
             getChartData();
-        });
-
 
 
             // Applications Dashboard Chart
@@ -344,63 +317,44 @@
             // Service Interaction Diagram
             const cy = cytoscape({
                 container: document.getElementById('cy'),
-
-                elements: [ // list of graph elements to start with
-                    { data: { id: 'a' } },
-                    { data: { id: 'b' } },
-                    { data: { id: 'c' } },
-                    { data: { id: 'd' } },
-                    { data: { id: 'e' } },
-                    { data: { id: 'f' } },
-                    { data: { id: 'g' } },
-                    { data: { id: 'h' } },
-                    { data: { id: 'i' } },
-                    { data: { id: 'j' } },
-                    { data: { id: 'k' } },
-                    { data: { id: 'l' } },
-
-                    { data: { id: 'ab', source: 'a', target: 'b' } },
-                    { data: { id: 'ac', source: 'a', target: 'c' } },
-                    { data: { id: 'ad', source: 'a', target: 'd' } },
-                    { data: { id: 'be', source: 'b', target: 'e' } },
-                    { data: { id: 'cf', source: 'c', target: 'f' } },
-                    { data: { id: 'dg', source: 'd', target: 'g' } },
-                    { data: { id: 'eh', source: 'e', target: 'h' } },
-                    { data: { id: 'fi', source: 'f', target: 'i' } },
-                    { data: { id: 'gj', source: 'g', target: 'j' } },
-                    { data: { id: 'hk', source: 'h', target: 'k' } },
-                    { data: { id: 'il', source: 'i', target: 'l' } }
-                ],
-
-                style: [ // the stylesheet for the graph
-                    {
-                        selector: 'node',
-                        style: {
-                            'background-color': '#3498db',
-                            'label': 'data(id)',
-                            'color': '#fff',
-                            'text-valign': 'center',
-                            'text-halign': 'center'
-                        }
-                    },
-
-                    {
-                        selector: 'edge',
-                        style: {
-                            'width': 3,
-                            'line-color': '#2ecc71',
-                            'target-arrow-color': '#2ecc71',
-                            'target-arrow-shape': 'triangle'
-                        }
-                    }
-                ],
-
-                layout: {
-                    name: 'grid',
-                    rows: 3
+                boxSelectionEnabled: false,
+                autounselectify: true,
+                style: cytoscape.stylesheet()
+                    .selector('node')
+                    .css({
+                        'shape': 'ellipse',
+                        'width': '60',
+                        'height': '60',
+                        'text-valign': 'center',
+                        'text-halign': 'center',
+                        'background-color': '#3498db',
+                        'color': '#fff',
+                        'label': 'data(id)'
+                    })
+                    .selector('edge')
+                    .css({
+                        'curve-style': 'bezier',
+                        'width': 4,
+                        'target-arrow-shape': 'triangle',
+                        'line-color': '#34495e',
+                        'target-arrow-color': '#34495e'
+                    }),
+                elements: {
+                    nodes: [
+                        { data: { id: 'Service A' } },
+                        { data: { id: 'Service B' } },
+                        { data: { id: 'Service C' } },
+                        { data: { id: 'Service D' } }
+                    ],
+                    edges: [
+                        { data: { source: 'Service A', target: 'Service B' } },
+                        { data: { source: 'Service B', target: 'Service C' } },
+                        { data: { source: 'Service C', target: 'Service D' } },
+                        { data: { source: 'Service D', target: 'Service A' } }
+                    ]
                 }
             });
-
+        });
     </script>
 </body>
 </html>
